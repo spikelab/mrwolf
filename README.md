@@ -1,2 +1,2 @@
-# mrwolf
-An AI agent to solve all your problems
+# Mr Wolf
+I'm Winston Wolf, I solve problems.
