@@ -1,6 +1,6 @@
-# Mr Wolf
+# Mr Wolf - exploring agentic systems
 
-![Mr Wolf](media/mrwolf.jpg)
+<img src="media/mrwolf.jpg" width="50%" alt="Mr Wolf">
 
 ## Overview
 
