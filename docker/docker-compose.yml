@@ -1,0 +1,97 @@
+volumes:
+  db_storage:
+  n8n_storage:
+  pgadmin:
+
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      N8N_PGSQL_USER: ${N8N_PGSQL_USER}
+      N8N_PGSQL_PASSWORD: ${N8N_PGSQL_PASSWORD}
+      N8N_PGSQL_DB: ${N8N_PGSQL_DB}
+      METABASE_PGSQL_USER: ${METABASE_PGSQL_USER}
+      METABASE_PGSQL_PASSWORD: ${METABASE_PGSQL_PASSWORD}
+      METABASE_PGSQL_DB: ${METABASE_PGSQL_DB}
+    volumes:
+      - db_storage:/var/lib/postgresql/data
+      - ./init-pgsql.sh:/docker-entrypoint-initdb.d/init-data.sh
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  n8n:
+    container_name: n8n
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: always
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${N8N_PGSQL_DB}
+      DB_POSTGRESDB_USER: ${N8N_PGSQL_USER}
+      DB_POSTGRESDB_PASSWORD: ${N8N_PGSQL_PASSWORD}
+    ports:
+      - 5678:5678
+    volumes:
+      - n8n_storage:/home/node/.n8n
+      - ${DATASEED_DIR}:/backups
+      - ./entrypoint-n8n.sh:/entrypoint.sh #need a custom entrypoint to allow for export of workflows to avoid data loss
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    stop_grace_period: 60s  # Give container time to perform export before 
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin4@pgadmin.org}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+       - pgadmin:/var/lib/pgadmin
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    restart: always
+    logging:
+      driver: "none"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  metabase:
+    image: metabase/metabase:v0.53.6.5
+    container_name: metabase
+    platform: linux/arm64
+    hostname: metabase
+    volumes:
+      - /dev/urandom:/dev/random:ro
+    ports:
+      - 3000:3000
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: ${METABASE_PGSQL_DB}
+      MB_DB_PORT: 5432
+      MB_DB_USER: ${METABASE_PGSQL_USER}
+      MB_DB_PASS: ${METABASE_PGSQL_PASSWORD}
+      MB_DB_HOST: postgres
+    healthcheck:
+      test: curl --fail -I http://localhost:3000/api/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+
