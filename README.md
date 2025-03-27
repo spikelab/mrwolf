@@ -55,7 +55,7 @@ Ben AI - This 20+ AI Agent Team Automates ALL Your Work (GPT-01) (Relevance AI)
 Something like that will represent the backbone and the baseline, but then the real work begins to go in depth on the above topics and try to implement  more complex RAG solutions, try different prompts and so on.
 
 ## Getting Started
-At this point you can go either the docker or "source" way. Docker is in many ways neater and all, but given the limited resources on my machine I appreciate the *source way* so that I can more quickly experiment and control things.
+I began with docker, but found it faster to hack on things if I installed locally with brew, especially when using ngrok or whisper, too much overhead setting everything up in docker. Still got some stuff left around that I may pick up later once I clean things up and try to make it easier for distribution, if I ever get there.
 
 ### Docker
 You need docker installed, then just checkout this repo and run docker-compose -f docker/docker-compose.yml up -d and you should see 4 containers showing up:
@@ -74,10 +74,19 @@ For N8N:
 - add the stuff to your shell profile as indicated in the ouput of the installation
 - nvm install v18.17.0
 - cd n8n
-- npm install n8n , local install, not global
-- set -a ; source env ; set +a
-- npx n8n to run
+- npm install n8n nodemon  (local install, not global)
+- npm run dev
 - note that by default n8n will use a local sqlite db which is kind of nice for testing
+- when connecting to ollama you need to use 127.0.0.1 instead of localhost, seems that otherwise ipv6 messes stuff up
+- you will also need to setup ngrok below and configure the webhook url if you want to be able to connect telegram or other services from outside
+
+For ngrok, which you need if you want to connect telegram to N8N:
+- you need to register on ngrok.com . It's free for just HTTP and ephemeral domain, but it does require registration
+- brew install ngrok
+- follow the instructions to connect your ngrok client to their platform (need token auth)
+- claim a free domain, easier than random ip numbers
+- run ngrok with your customer domain as a parameter and watch the magic happening
+- this is a good video with all the steps: https://www.youtube.com/watch?v=3sshIaiotmc
 
 For Ollama:
 - brew install ollama
@@ -89,8 +98,18 @@ For postgresl:
 - brew install postgresql
 - brew services start postgresql
 - psql postgres to get in and test it
+- brew install pgvector
+- psql postgres , CREATE EXTENSION vector;
 
-Besides that, you will need to setup telegram and llama.ccp if you want for local inference (need brew for that) or Bedrock/openAI pls whatever other 3rd party tool we use (say google for email and drive)
+For stt:
+- brew install whisper-cpp
+- download whatever models you want, I used https://huggingface.co/distil-whisper/distil-large-v3-ggml/tree/main and https://huggingface.co/ggerganov/whisper.cpp/tree/main larger-turbo v3
+- brew install ffmpeg if you wanna be able to feed it mp3s, whisper otherwise works off of WAVs
+- start the server, whisper-server -m whisper-ggml-distil-large-v3.bin --convert -pp -pr --port 1332 for example, this lets you upload mp3s and prints output in realtime and progress. Note that the client does not support streaming so you will only see a reply once the whole thing is done, but you can watch the server in console outputting stuff. Note by default the server starts on 8080, I changed that.
+- test it with any mp3 as this curl: curl -F "file=@/path/to/file.mp3" "http://localhost:1332/inference?timestamp=true"
+
+
+Besides that, you will need to setup telegram and ngrok so that 
 
 If you are using llama.cpp for local inferencing you most likely want to shut down pgadmin and metabase to get some resources back. It may also make sense to support a mode with N8N running locally with sqlite as default without even docker and no pgsql, but then you need a different vector store, which I'm not sure what it'd buy you mem profile wise over using pgsql.
 
@@ -112,9 +131,11 @@ all models are quantized to 4bit and Q_M for balanced perf and quality. Also on 
 
 ### N8N
 
+- The simplest possible AI agent with N8N and ollama and postgresql for memory: https://www.youtube.com/watch?v=y9m3i12qkms
 - Building the Ultimate RAG setup with Contextual Summaries, Sparse Vectors and Reranking https://community.n8n.io/t/building-the-ultimate-rag-setup-with-contextual-summaries-sparse-vectors-and-reranking/54861
 - Don't Build Another RAG Agent Until You See This: Anthropic's Contextual RAG Strategy! ~ n8n https://www.youtube.com/watch?v=WUF2roFLDPE
 - Trying to add streaming to N8N https://github.com/n8n-io/n8n/pull/11888/commits/4175789afc35d7a4af90b1f65b776ddc0fd9b061
+- Starts from the very basics and builds up all the way to agents, really comprehensive: https://www.youtube.com/watch?v=ZHH3sr234zY
 
 ### Voice
 
@@ -122,6 +143,7 @@ all models are quantized to 4bit and Q_M for balanced perf and quality. Also on 
 - another apparently great option for voice models: https://cartesia.ai/
 - Polly voices samples https://www.youtube.com/watch?v=nUX-6_aRvGE and using AI to markup timbre for SSML https://grebler.medium.com/using-generative-ai-for-marking-up-speech-synthesis-78e1b5536c0d
 - AWS sample code for polly https://github.com/aws-samples/amazon-bedrock-voice-conversation
+- one more on voice conversations: https://lomaky.medium.com/ai-conversation-app-a-multilingual-back-and-forth-voice-conversation-and-data-extraction-angular-e5c8875e695c
 
 ### RAG Techniques
 
